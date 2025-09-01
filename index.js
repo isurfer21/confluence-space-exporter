@@ -141,54 +141,12 @@ async function fetchChildren(pageId) {
   return data.results || [];
 }
 
-// Build hierarchy tree
-/*async function buildPageTree(pages) {
-  const pageMap = new Map();
-
-  // Initialize map and children array
-  for (const page of pages) {
-    page.children = [];
-    pageMap.set(page.id, page);
-  }
-
-  // Fetch children and attach them properly
-  for (const page of pages) {
-    const children = await fetchChildren(page.id);
-    for (const child of children) {
-      child.children = [];
-      pageMap.set(child.id, child);
-      page.children.push(child);
-    }
-  }
-
-  // Filter out true root pages (those not listed as children)
-  const childIds = new Set();
-  for (const page of pages) {
-    for (const child of page.children) {
-      childIds.add(child.id);
-    }
-  }
-
-  const rootPages = pages.filter(page => !childIds.has(page.id));
-  return rootPages;
-}
-*/
-
-
-/**
- * Recursively builds a hierarchy tree by fetching children for each page,
- * ensuring each unique page appears only once in the final tree structure.
- *
- * @param {Array<object>} initialPages - The initial flat list of pages (e.g., from response.json).
- * @returns {Promise<Array<object>>} A promise that resolves to an array of root page objects
- *   with nested 'children' arrays representing the full hierarchy.
- */
+// Recursively builds a hierarchy tree by fetching children for each page, ensuring each unique page appears only once in the final tree structure.
 async function buildPageTree(initialPages) {
   const pageMap = new Map(); // Stores all unique page objects by ID
   const childOfMap = new Map(); // Maps child ID to its parent ID (to identify roots)
 
-  // 1. Populate pageMap with initial pages and initialize their children arrays
-  //    Also, add them to a queue for processing.
+  // 1. Populate pageMap with initial pages and initialize their children arrays. Also, add them to a queue for processing.
   const queue = [];
   for (const page of initialPages) {
     if (!pageMap.has(page.id)) { // Only add if not already processed (e.g., if it was a child of something else)
@@ -198,8 +156,7 @@ async function buildPageTree(initialPages) {
     }
   }
 
-  // 2. Process pages in a queue (BFS-like approach) to fetch children level by level
-  //    This helps manage recursion depth and ensures all children are discovered.
+  // 2. Process pages in a queue (BFS-like approach) to fetch children level by level. This helps manage recursion depth and ensures all children are discovered.
   let head = 0;
   while (head < queue.length) {
     const currentPage = queue[head++]; // Get the next page from the queue
@@ -223,15 +180,13 @@ async function buildPageTree(initialPages) {
       }
 
       // Add the child to the current page's children list
-      // IMPORTANT: Ensure we're adding the *single instance* from pageMap
-      // Also, prevent adding the same child multiple times to one parent's children array
+      // IMPORTANT: Ensure we're adding the *single instance* from pageMap. Also, prevent adding the same child multiple times to one parent's children array
       if (!currentPage.children.some(c => c.id === childPage.id)) {
         currentPage.children.push(childPage);
       }
 
       // Record that this child has a parent.
-      // If a child has multiple parents, this will store the last one encountered.
-      // For a strict tree, this implies a single parent.
+      // If a child has multiple parents, this will store the last one encountered. For a strict tree, this implies a single parent.
       childOfMap.set(childPage.id, currentPage.id);
     }
   }
@@ -247,8 +202,6 @@ async function buildPageTree(initialPages) {
 
   return rootPages;
 }
-
-
 
 // Generate hierarchical HTML list
 function generateHtmlList(pages) {
@@ -278,20 +231,20 @@ async function generateIndexHtmlHierarchical(pages) {
   await mkdir(outputDir, { recursive: true });
   const flatPages = await fetchPages();
 
-  // for (const page of flatPages) {
-  //   const { title, xhtml } = await fetchPageContent(page.id);
-  //   const pageDir = join(outputDir, title);
-  //   await mkdir(pageDir, { recursive: true });
+  for (const page of flatPages) {
+    const { title, xhtml } = await fetchPageContent(page.id);
+    const pageDir = join(outputDir, title);
+    await mkdir(pageDir, { recursive: true });
 
-  //   const cleanedHtml = htmlTemplate(title, xhtml);
-  //   await writeFile(join(pageDir, `${title}.html`), cleanedHtml, "utf8");
-  //   console.log(`✅ Saved: ${title}.html`);
+    const cleanedHtml = htmlTemplate(title, xhtml);
+    await writeFile(join(pageDir, `${title}.html`), cleanedHtml, "utf8");
+    console.log(`✅ Saved: ${title}.html`);
 
-  //   // const attachments = await fetchAttachments(page.id);
-  //   // for (const attachment of attachments) {
-  //   //   await downloadAttachment(attachment, pageDir);
-  //   // }
-  // }
+    const attachments = await fetchAttachments(page.id);
+    for (const attachment of attachments) {
+      await downloadAttachment(attachment, pageDir);
+    }
+  }
 
   const pageTree = await buildPageTree(flatPages);
   await generateIndexHtmlHierarchical(pageTree);
